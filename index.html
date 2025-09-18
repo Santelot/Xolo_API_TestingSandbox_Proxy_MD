@@ -167,32 +167,46 @@
     .toolbar-btn:hover:not(:disabled) { background: var(--bg-panel-secondary); color: var(--text-light); }
     .toolbar-btn:disabled { opacity: .4; cursor: not-allowed; }
 
-    .modal-backdrop {
-      position: fixed; inset: 0; background: rgba(13, 12, 29, 0.8);
-      backdrop-filter: blur(5px); display: flex; align-items: center;
-      justify-content: center; z-index: 50; animation: fadeIn 0.3s ease;
+    /* ===== Loader de IA (reemplaza el cuadro de identificación) ===== */
+    .ai-loading-backdrop {
+      position: fixed; inset: 0; z-index: 99;
+      display: flex; align-items: center; justify-content: center; flex-direction: column;
+      background: radial-gradient(1200px 600px at 50% 50%, rgba(var(--gradient-start-rgb),0.15), transparent 60%), rgba(10,9,21,0.92);
+      backdrop-filter: blur(6px);
+      animation: loaderFadeIn .25s ease-out;
     }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    .modal {
-      width: min(500px, 90vw); background: var(--bg-panel); border: 1px solid var(--bg-panel-secondary);
-      border-radius: 16px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    @keyframes loaderFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .ai-loading-backdrop.hide {
+      opacity: 0; transform: scale(0.98);
+      transition: opacity .35s ease, transform .35s ease;
+      pointer-events: none;
     }
-    .modal h2 { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; }
-    .modal p { margin: 0 0 16px 0; color: var(--text-muted); font-size: 15px; line-height: 1.6; }
-    .modal .row { display:flex; gap: 12px; }
-    .modal input {
-      flex: 1; height: 48px; padding: 0 16px; border-radius: 12px;
-      border: 1px solid var(--bg-panel-secondary); background: var(--bg-dark);
-      color: var(--text-light); font-size: 1rem; outline: none;
-      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    .ai-orbital {
+      width: 140px; height: 140px; position: relative;
+      border-radius: 50%;
+      box-shadow: 0 0 40px rgba(var(--gradient-start-rgb), 0.45), inset 0 0 30px rgba(var(--gradient-end-rgb), 0.25);
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), rgba(255,255,255,0) 40%), linear-gradient(135deg, rgba(var(--gradient-start-rgb), 0.4), rgba(var(--gradient-end-rgb), 0.4));
+      overflow: visible;
     }
-    .modal input:focus { border-color: var(--gradient-start-color); box-shadow: 0 0 8px rgba(var(--gradient-start-rgb), 0.6); }
-    .modal button {
-      border: none; background: linear-gradient(45deg, var(--gradient-end-color), var(--gradient-start-color));
-      color: white; padding: 0 24px; height: 48px; border-radius: 12px; cursor: pointer;
-      font-weight: 600; transition: transform 0.2s ease, box-shadow 0.3s ease;
+    .ai-orbital::before, .ai-orbital::after {
+      content: ""; position: absolute; inset: -18px; border-radius: 50%;
+      border: 2px dashed rgba(255,255,255,0.15);
+      animation: orbit 3.6s linear infinite;
     }
-    .modal button:hover { transform: translateY(-2px); box-shadow: 0 0 12px rgba(var(--gradient-start-rgb), 0.8); }
+    .ai-orbital::after { inset: -34px; animation-duration: 6.4s; border-style: solid; border-color: rgba(255,255,255,0.07); }
+    @keyframes orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .ai-node {
+      position: absolute; width: 10px; height: 10px; border-radius: 50%;
+      background: white; top: 50%; left: 50%; transform-origin: -60px -60px;
+      box-shadow: 0 0 8px rgba(255,255,255,0.8), 0 0 18px rgba(var(--gradient-start-rgb), 0.6);
+      animation: nodeSpin 2.2s ease-in-out infinite;
+    }
+    .ai-node:nth-child(2) { transform-origin: -35px -35px; animation-duration: 1.6s; opacity: .9; }
+    .ai-node:nth-child(3) { transform-origin: -80px -20px; animation-duration: 2.8s; opacity: .75; }
+    @keyframes nodeSpin { 0% { transform: rotate(0deg) translateX(0); } 50% { transform: rotate(180deg) translateX(6px); } 100% { transform: rotate(360deg) translateX(0); } }
+    .ai-subtext {
+      margin-top: 16px; color: var(--text-muted); font-size: 14px; letter-spacing: .3px;
+    }
   </style>
 </head>
 <body>
@@ -224,20 +238,19 @@
     </div>
   </div>
 
-  <div class="modal-backdrop" id="ident-backdrop" role="dialog" aria-modal="true" aria-labelledby="ident-title">
-    <div class="modal">
-      <h2 id="ident-title">Identifícate para esta sesión</h2>
-      <p>Proporciona un ID (matrícula, alias, etc.). Usaremos un hash para generar una sesión estable y privada para ti.</p>
-      <div class="row">
-        <input id="identityInput" placeholder="Ej: prueba, a0123456, m.garcia" autocomplete="username" />
-        <button id="identityBtn">Continuar</button>
-      </div>
+  <!-- Loader de IA (sustituye el cuadro de identificación) -->
+  <div class="ai-loading-backdrop" id="ai-loader">
+    <div class="ai-orbital">
+      <span class="ai-node"></span>
+      <span class="ai-node"></span>
+      <span class="ai-node"></span>
     </div>
+    <div class="ai-subtext">Inicializando motor de IA…</div>
   </div>
 
   <script>
     /* ========================================================
-     * 🎨 UI & PERSONALIZACIÓN - ¡Modifica estos valores!
+     * 🎨 UI & PERSONALIZACIÓN
      * ======================================================== */
     const UI_CONFIG = {
       INITIAL_BOT_MESSAGE: "¡Hola! Soy Xolo, tu compañero de aprendizaje en Innovación y Tecnología. ¿Cómo te llamas? Por favor, dime tu nombre y cuéntame un poco sobre tus intereses: ¿te gusta el fútbol, la música, algún hobby, películas o animales? Con esa información podré personalizar nuestro aprendizaje. ¡Vamos a crear algo increíble hoy!",
@@ -246,7 +259,7 @@
     };
 
     /* =========================
-     * ⚙️ CONFIG API - Rellenar
+     * ⚙️ CONFIG API
      * ========================= */
     const CHATBASE_CHATBOT_ID = "oSTY10WXrzUrKWp420JQ9";
     const DEFAULT_TEMPERATURE = 0.6;
@@ -254,7 +267,7 @@
     const USE_STREAMING = true;
 
     /* =========================
-     * 🧠 ESTADO & ELEMENTOS DOM
+     * 🧠 ESTADO & ELEMENTOS
      * ========================= */
     const chatEl = document.getElementById("chat");
     const promptEl = document.getElementById("prompt");
@@ -262,13 +275,11 @@
     const newChatBtn = document.getElementById("newChatBtn");
     const cidPill = document.getElementById("cid-pill");
     const uidPill = document.getElementById("uid-pill");
-    const identBackdrop = document.getElementById("ident-backdrop");
-    const identityInput = document.getElementById("identityInput");
-    const identityBtn = document.getElementById("identityBtn");
+    const aiLoader = document.getElementById("ai-loader");
 
     let messages = [];
-    let userIdentity = null, userUID = null, conversationId = null;
-    
+    let userUID = null, conversationId = null;
+
     function hexToRgb(hex) {
       const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
       return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : null;
@@ -278,7 +289,7 @@
      * ✅ INICIO Y LISTENERS
      * ========================= */
 
-    // 🔔 LISTENER REQUERIDO: Lanza una alerta si el asistente manda "AURORA_RETROFLEX".
+    // 🔔 LISTENER: AURORA_RETROFLEX
     window.addEventListener("chatbot:assistant_message", (e) => {
       const msg = (e.detail?.text ?? "").trim();
       if (msg.includes("AURORA_RETROFLEX")) {
@@ -293,97 +304,75 @@
       root.style.setProperty('--gradient-start-rgb', hexToRgb(UI_CONFIG.GRADIENT_COLOR_1));
       root.style.setProperty('--gradient-end-rgb', hexToRgb(UI_CONFIG.GRADIENT_COLOR_2));
 
+      // IDs auto-generados (timestamp + random)
+      userUID = generateUID("uid");
+      resetConversationId(); // genera conversationId
+
+      updateBadges();
+
+      // Listeners
       sendBtn.addEventListener("click", onSend);
       promptEl.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
       });
       newChatBtn.addEventListener("click", startNewConversationSameUID);
 
-      setupIdentityModal();
-      await ensureIdentity();
+      // Simular carga bonita y habilitar UI
+      showLoader();
+      setTimeout(() => {
+        hideLoader();
+        promptEl.disabled = false;
+        sendBtn.disabled = false;
+        newChatBtn.disabled = false;
+        promptEl.focus();
 
-      promptEl.disabled = false;
-      sendBtn.disabled = false;
-      newChatBtn.disabled = false;
-      promptEl.focus();
-
-      messages = loadMessagesFor(conversationId);
-      if (messages.length === 0) {
-        appendMessage("assistant", UI_CONFIG.INITIAL_BOT_MESSAGE);
-      } else {
-        for (const m of messages) {
-          if (m.role === "assistant") {
-            const el = appendBubbleOnly("assistant", "", true);
-            renderAssistantMarkdownInto(el, m.content);
-          } else {
-            appendBubbleOnly(m.role, m.content);
+        // Cargar historial si existiera (por convId nuevo normalmente no habrá)
+        messages = loadMessagesFor(conversationId);
+        if (messages.length === 0) {
+          appendMessage("assistant", UI_CONFIG.INITIAL_BOT_MESSAGE);
+        } else {
+          for (const m of messages) {
+            if (m.role === "assistant") {
+              const el = appendBubbleOnly("assistant", "", true);
+              renderAssistantMarkdownInto(el, m.content);
+            } else {
+              appendBubbleOnly(m.role, m.content);
+            }
           }
+          scrollToEnd();
         }
-        scrollToEnd();
-      }
+      }, 900); // duración del loader
     });
 
+    function showLoader() {
+      aiLoader.classList.remove("hide");
+      aiLoader.style.display = "flex";
+    }
+    function hideLoader() {
+      aiLoader.classList.add("hide");
+      setTimeout(() => { aiLoader.style.display = "none"; }, 350);
+    }
+
     /* =========================
-     * 🙋 Identidad estable (LÓGICA ORIGINAL)
+     * 🔐 IDs auto-generados
      * ========================= */
-    function setupIdentityModal() {
-      const last = localStorage.getItem("demo_identity_input") || "";
-      if (last) identityInput.value = last;
-      identityBtn.addEventListener("click", handleIdentityContinue);
-      identityInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") { e.preventDefault(); handleIdentityContinue(); }
-      });
-      showIdentityModal();
-    }
-    function handleIdentityContinue() {
-      const raw = identityInput.value.trim();
-      if (!raw) { identityInput.focus(); return; }
-      localStorage.setItem("demo_identity_input", raw);
-      userIdentity = raw;
-      userUID = normalizeIdentity(userIdentity);
-
-      // 🔄 NUEVO: conversationId generado por timestamp + random
-      conversationId = generateConversationId();
-
-      updateBadges();
-      hideIdentityModal();
-    }
-    function ensureIdentity() {
-      return new Promise((resolve) => {
-        const i = setInterval(() => {
-          if (identBackdrop.hasAttribute("hidden")) { clearInterval(i); resolve(); }
-        }, 50);
-      });
-    }
-    function showIdentityModal() {
-      identBackdrop.removeAttribute("hidden");
-      identBackdrop.style.display = "flex";
-      identBackdrop.setAttribute("aria-hidden", "false");
-      setTimeout(() => identityInput.focus(), 0);
-    }
-    function hideIdentityModal() {
-      identBackdrop.setAttribute("hidden", "");
-      identBackdrop.style.display = "none";
-      identBackdrop.setAttribute("aria-hidden", "true");
-    }
-    function normalizeIdentity(s) { return s.normalize("NFKC").trim().toLowerCase(); }
-
-    // 🆕 Generador de IDs de conversación: timestamp + random criptográfico (no colisiona fácilmente)
-    function generateConversationId() {
+    function generateUID(prefix = "id") {
       const ts = Date.now().toString(36);
-      const arr = new Uint32Array(2);
-      crypto.getRandomValues(arr);
-      const rand = Array.from(arr).map(n => n.toString(36).padStart(7, '0')).join('');
-      return `cid-${ts}-${rand}`;
+      const rand = crypto.getRandomValues(new Uint32Array(2));
+      const r = Array.from(rand).map(n => n.toString(36)).join('');
+      return `${prefix}-${ts}-${r}`;
     }
-
+    function resetConversationId() {
+      conversationId = generateUID("cid");
+      updateBadges();
+    }
     function updateBadges() {
       uidPill.textContent = `UID: ${userUID ?? "—"}`;
       cidPill.textContent = `Conversación: ${(conversationId ?? "—").slice(0, 12)}…`;
     }
-    
+
     /* =========================
-     * 🚀 POST /api/v1/chat
+     * 🚀 POST /chat
      * ========================= */
     async function onSend() {
       if (!conversationId || sendBtn.disabled) return;
@@ -410,7 +399,7 @@
             messages: messages.slice(0, -1),
             stream: USE_STREAMING,
             temperature: DEFAULT_TEMPERATURE,
-            conversationId, // ahora es el nuevo cid aleatorio-por-timestamp
+            conversationId,
             ...(OVERRIDE_MODEL ? { model: OVERRIDE_MODEL } : {})
           }),
         });
@@ -426,17 +415,14 @@
             const { value, done: doneReading } = await reader.read(); done = doneReading;
             const chunk = decoder.decode(value || new Uint8Array(), { stream: !done });
             acc += chunk;
-            // Mostrar como texto plano durante el stream
             botMsgEl.textContent = acc.replace(/^data:\s*/gm, "").replace(/\n?data:\s*\[DONE\]\s*$/m, "");
             scrollToEnd();
           }
-          // Texto crudo final (sin prefijos SSE)
           const finalRaw = botMsgEl.textContent;
           finalizeAssistantMessage(botMsgEl, finalRaw);
         } else {
           const data = await res.json();
           const finalRaw = data?.text || "(sin respuesta)";
-          // Mostrar directamente versión Markdown final
           finalizeAssistantMessage(botMsgEl, finalRaw);
         }
       } catch (err) {
@@ -474,7 +460,6 @@
       persistState();
     }
 
-    // ⬇️ Finaliza guardando texto crudo y renderizando Markdown + botones
     function finalizeAssistantMessage(el, rawText) {
       const lastIdx = messages.length - 1;
       if (lastIdx >= 0 && messages[lastIdx].role === "assistant") {
@@ -495,13 +480,10 @@
     function persistState() { if (!conversationId) return; localStorage.setItem(`msgs_${conversationId}`, JSON.stringify(messages)); }
     function loadMessagesFor(cid) { try { const raw = localStorage.getItem(`msgs_${cid}`); return raw ? JSON.parse(raw) : []; } catch { return []; } }
 
-    // 🆕 “Nueva Conversación” ahora regenera conversationId y arranca limpio
     function startNewConversationSameUID() {
-      // Opcional: conservar historial del cid anterior en localStorage (no se borra)
+      resetConversationId();     // ← Recalcula conversationId
       chatEl.innerHTML = "";
       messages = [];
-      conversationId = generateConversationId(); // ← NUEVO ID
-      updateBadges();
       persistState();
       appendMessage("assistant", UI_CONFIG.INITIAL_BOT_MESSAGE);
     }
@@ -509,8 +491,6 @@
     /* ========================================================
      * 🧩 Render Markdown + Bloques de código con botones
      * ======================================================== */
-
-    // Sanitiza caracteres peligrosos básicos
     function escapeHtml(str) {
       return str
         .replace(/&/g, "&amp;")
@@ -518,12 +498,10 @@
         .replace(/>/g, "&gt;");
     }
 
-    // Transformación ligera de Markdown a HTML
     function markdownToHtml(md) {
       if (!md) return "";
       let text = md.replace(/\r\n/g, "\n");
 
-      // Proteger bloques de código triple: ```lang?\ncode\n```
       const codeBlocks = [];
       text = text.replace(/```([\w-]+)?\n([\s\S]*?)```/g, (m, lang, code) => {
         const idx = codeBlocks.length;
@@ -531,30 +509,25 @@
         return `{{{CODEBLOCK:${idx}}}}`;
       });
 
-      // Inline code
       text = text.replace(/`([^`]+?)`/g, (_m, c) => `<code>${escapeHtml(c)}</code>`);
 
-      // Headers
       text = text
         .replace(/^###\s+(.+)$/gm, "<h3>$1</h3>")
         .replace(/^##\s+(.+)$/gm, "<h2>$1</h2>")
         .replace(/^#\s+(.+)$/gm, "<h1>$1</h1>");
 
-      // Bold/italic
       text = text
         .replace(/\*\*([^*]+?)\*\*/g, "<strong>$1</strong>")
         .replace(/\*([^*]+?)\*/g, "<em>$1</em>");
 
-      // Links
       text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, `<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>`);
 
-      // Lists
       text = text.replace(/^(?:-|\*)\s+(.+)$/gm, "<li>$1</li>");
       text = text.replace(/(<li>.*<\/li>)(\n<li>.*<\/li>)+/g, (m) => `<ul>${m.replace(/\n/g, "")}</ul>`);
+
       text = text.replace(/^\d+\.\s+(.+)$/gm, "<li>$1</li>");
       text = text.replace(/(<li>.*<\/li>)(\n<li>.*<\/li>)+/g, (m) => `<ol>${m.replace(/\n/g, "")}</ol>`);
 
-      // Párrafos
       const lines = text.split(/\n+/);
       text = lines.map(line => {
         if (!line.trim()) return "";
@@ -562,10 +535,10 @@
         return `<p>${line}</p>`;
       }).join("");
 
-      // Insertar bloques de código
       text = text.replace(/{{{CODEBLOCK:(\d+)}}}/g, (_m, iStr) => {
         const i = parseInt(iStr, 10);
         const { lang, code } = codeBlocks[i];
+        const langLabel = lang ? ` data-lang="${escapeHtml(lang)}"` : "";
         const codeEsc = escapeHtml(code);
         return `
           <div class="code-block">
@@ -575,7 +548,7 @@
               <button class="btn-toggle" title="Colapsar/Expandir">Colapsar</button>
             </div>
             <div class="code-body">
-              <pre><code${lang ? ` data-lang="${escapeHtml(lang)}"` : ""}>${codeEsc}</code></pre>
+              <pre><code${langLabel}>${codeEsc}</code></pre>
             </div>
           </div>
         `;
